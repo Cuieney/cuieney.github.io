@@ -1,0 +1,273 @@
+---
+layout:     post
+title:      "Andorid 内存调优"
+subtitle:   " \"Hello World, Hello Android\""
+date:       2016-12-15 13:00:00
+author:     "Cuieney"
+header-img: "img/post-bg-2015.jpg"
+catalog: true
+tags:
+    - 优化
+---
+
+> “Yeah It's on. ”
+
+
+## 前言
+
+Hux 的 Blog 就这么开通了。
+
+[跳过废话，直接看技术实现 ](#build) 
+
+
+
+### 内存泄漏原因：
+------
+**Java**内存泄漏指的是进程中某些垃圾对象已经没有使用价值了，但是它们却可以直接或间接地引用到gc roots导致无法被GC回收。无用的对象占据着内存空间，使得实际可使用内存变小，形象地说法就是内存泄漏了。
+
+### 内存泄漏优化：
+-----
+内存泄漏的优化分为两个方面，一方面实在开发过程中避免写出泄漏的代码，另一方面则是通过一些分析工具MAT,LeakCanary来找出潜在的内存泄漏继而解决。
+
+### 常见内存泄漏： 
+------
+ 1:静态变量导致的内存泄漏，下面的情况就是activity无法正常销毁，因为静态变量Context引用了它。
+
+```
+   public class MainActivity extends Activity {
+   private static Context mContext;
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        mContext = this;
+    }
+}
+
+```
+
+上面的代码我们也可以改造一下，mView是一个静态变量，他的内部持有当前的activity，所以activity仍然无法释放，估计这样好理解点。
+
+```
+public class MainActivity extends Activity {
+
+private static View mView;
+
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+    mView = new View(this);
+}
+}
+
+```
+
+2:非静态内部类的静态实例导致内存泄漏,下面的情况可以看得出静态实例，一直持有当前的activity的引用，我们称为act1吧。当act1 onDestory（）的时候并没有被回收，当我们再次创建的时候会出现act2，进程中就会出现两个act，因此对于launchMode不是singleInstance的activity，因避免这种情况
+
+```
+   public class MainActivity extends Activity {
+
+    private static ExampleDemo demo;
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        demo = new ExampleDemo();
+    }
+}
+
+```
+
+```
+class ExampleDemo{
+  void doSomeThing(){
+            ...
+  }
+} 
+
+```
+
+3:单例模式，单例模式应该是设计模式被开发者所喜爱的设计模式，使用简单粗暴。但是单例模式所带来的内存泄漏是我们容易忽视的，如下所示提供一个单例模式
+
+```
+ public class OrmHelper {
+    private Context context;
+
+    private static OrmHelper ormHelper;
+
+    public OrmHelper(Context context) {
+        this.context = context;
+    }
+
+    public static OrmHelper getInstance(Context context) {
+        synchronized (OrmHelper.class) {
+            if (ormHelper == null) {
+                ormHelper = new OrmHelper(context);
+            }
+        }
+        return ormHelper;
+    }
+}
+
+```
+
+泄漏的原因是OrmHelper会一直持有context对象，导致当前的activity无法被回收，而单例模式的特点是其生命周期和application保存一直，因此activity对象无法回收。下面是单例模式的优化。使用弱引用。
+
+```
+public class OrmHelper {
+    private WeakReference<Context> context;
+
+    private static OrmHelper ormHelper;
+
+    public OrmHelper(Context context) {
+        this.context = new WeakReference<Context>(context);
+    }
+
+    public static OrmHelper getInstance(Context context) {
+        synchronized (OrmHelper.class) {
+            if (ormHelper == null) {
+                ormHelper = new OrmHelper(context);
+            }
+        }
+        return ormHelper;
+    }
+}
+
+```
+
+也可以有另一种方式，就是如果这个工具类在app中进程经常被使用可以传入ApplicationContext。
+
+4:属性动画导致内存泄漏，在android3.0开始Google提供了属性动画，属性动画中又有一种无线循环的动画，如果在activity中播放此类动画，没有在ondestory中进行停止动画，那么动画会一直播放，尽管无法再页面上看到动画效果，但activity的view 会被动画持有，而view又持有activity。最终导致activity无法被释放。解决方法就是在onDestory中调用animator.cancle();下面是一个例子
+
+```
+public class MainActivity extends Activity {
+
+    private Button mButton;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        mButton = ((Button) findViewById(R.id.sub));
+
+        ObjectAnimator animator = ObjectAnimator.ofFloat(mButton,"rotation",0,360).setDuration(2000);
+        animator.setRepeatCount(ValueAnimator.INFINITE);
+        animator.start();
+//        animator.cancel();
+    }
+}
+
+```
+
+5:注册某个对象后没有反注册,假设我们要监听电话状态，需要创建个PhoneStateListener，同时要将它注册到telephoyManager中。
+
+```
+public class MainActivity extends Activity {
+    private TelephonyManager tm;
+    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
+        @Override
+        public void onCallStateChanged(int state, String incomingNumber) {
+            switch (state) {
+                case TelephonyManager.CALL_STATE_IDLE:
+                    break;
+
+                case TelephonyManager.CALL_STATE_RINGING: {
+                    break;
+                }
+                case TelephonyManager.CALL_STATE_OFFHOOK: {
+                    break;
+                }
+            }
+            super.onCallStateChanged(state, incomingNumber);
+        }
+    };
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        tm = (TelephonyManager)getSystemService(Service.TELEPHONY_SERVICE);
+        tm.listen(mPhoneStateListener,PhoneStateListener.LISTEN_CALL_STATE);
+    }
+}
+
+```
+
+这种情况就回出现很严重的内存泄漏，没有反注册。我们在onCreate中进行了注册，则需要在OnDestory（）进行反注册，同时把activity的引用缓存弱引用，尽量来避免内存泄漏。
+
+```
+public class MainActivity extends Activity {
+    private TelephonyManager tm;
+    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
+        @Override
+        public void onCallStateChanged(int state, String incomingNumber) {
+            switch (state) {
+                case TelephonyManager.CALL_STATE_IDLE:
+                    break;
+
+                case TelephonyManager.CALL_STATE_RINGING: {
+                    break;
+                }
+                case TelephonyManager.CALL_STATE_OFFHOOK: {
+                    break;
+                }
+            }
+            super.onCallStateChanged(state, incomingNumber);
+        }
+    };
+    private WeakReference<Context> weakReference;
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        weakReference = new WeakReference<Context>(this);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                tm = (TelephonyManager)weakReference.get().getSystemService(Service.TELEPHONY_SERVICE);
+                tm.listen(mPhoneStateListener,PhoneStateListener.LISTEN_CALL_STATE);
+            }
+        }).start();
+
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        tm.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+    }
+}
+
+```
+
+在这里我们做了两方面优化，1.引用缓存弱引用，2.创建telephonyManager的时候在线程中创建（通过dump 最终发现是 PhoneStateListener 内部对自己有一个强引用的handler，如果是在主线程中引用PhoneStateListener，那么他将释放不掉，引发内存泄露）。
+
+
+6:回调接口，android 4.0已经使用弱引用来解决了这个问题
+
+```
+ private WeakReference<IMusicCallBack> callBackWeakReference;
+    public void setCallBack(IMusicCallBack callBack){
+        callBackWeakReference = new WeakReference<IMusicCallBack>(callBack);
+    }
+
+```
+
+7:集合对象没有清理造成内存泄漏,我们通常把一些对象的引用加入到了集合中，当我们不需要该对象时，如果没有把它的引用从集合中清理掉，这样这个集合就会越来越大。如果这个集合是static的话，那这种内存泄漏情况就更严重了。
+
+8:资源对象没有手动关闭或处理，资源性对象比如(Cursor，File文件等)往往都用了一些缓冲，我们在不使用的时候，应该及时关闭它们，以便它们的缓冲及时回收内存。它们的缓冲不仅存在于 java虚拟机内，还存在于java虚拟机外。如果我们仅仅是把它的引用设置为null,而不关闭它们，往往会造成内存泄漏。因为有些资源性对象，比如 SQLiteCursor(在析构函数finalize(),如果我们没有关闭它，它自己会调close()关闭)，如果我们没有关闭它，系统在回收它时也会关闭它，但是这样的效率太低了。因此对于资源性对象在不使用的时候，应该调用它的close()函数，将其关闭掉，然后才置为null.在我们的程序退出时一定要确保我们的资源性对象已经关闭。
+
+9:Bitmap使用不当1.及时的销毁给bitmap分配的内存，recycle。2.有些时候我们需要显示的图片区域很小，没有必要把原图全部显示出来，而只需要显示缩小过得图片，降低采样率就行了。这样大大的减少了内存的使用。
+
+
+### 总结
+----
+在开发中内存泄漏问题，还会有很多种情况，开发中尽量避免写出有内存泄漏的代码，但并不是每个内存泄漏都需要解决，我们只是尽量的让内存泄漏减少，来优化app内存。希望对广大读者开发有好的帮助。
+
+
+
+—— Cuieney 后记于 2016.12
+
+
