@@ -1,86 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  
-  <title>CuieneyBlog</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta property="og:type" content="website">
-<meta property="og:title" content="CuieneyBlog">
-<meta property="og:url" content="http://yoursite.com/index.html">
-<meta property="og:site_name" content="CuieneyBlog">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="CuieneyBlog">
-  
-    <link rel="alternate" href="/atom.xml" title="CuieneyBlog" type="application/atom+xml">
-  
-  
-    <link rel="icon" href="images/ironMan.ico">
-  
-  <link rel="stylesheet" href="/css/typing.css">
-</head>
+---
+layout: page
+description: "一生想做浪漫极客"
+---
 
-  
-    
-    <body class="home-body dark">
-    
-  
-      <div id="container" class="container">
-        <div class="home">
-  <div class="content">
-    <div class="profile">
-      <h1 class="nickname">Cuieney</h1>
-      <div class="description">
-        <p><p>I am an Android developer,  student and reader. Like music. Living in the seaside town. The dream is contribute a useful open source project~</p>
-</p>
-      </div>
-    </div>
-    <hr/>
-    <ul class="links">
-      
-        <li>
-          <a href="/archives">Blog</a>
-        </li>
-      
-        <li>
-          <a href="https://github.com/Cuieney">GitHub</a>
-        </li>
-      
-        <li>
-          <a href="/about">About</a>
-        </li>
-      
-    </ul>
-  </div>
+{% for post in paginator.posts %}
+<div class="post-preview">
+    <a href="{{ post.url | prepend: site.baseurl }}">
+        <h2 class="post-title">
+            {{ post.title }}
+        </h2>
+        {% if post.subtitle %}
+        <h3 class="post-subtitle">
+            {{ post.subtitle }}
+        </h3>
+        {% endif %}
+        <div class="post-content-preview">
+            {{ post.content | strip_html | truncate:200 }}
+        </div>
+    </a>
+    <p class="post-meta">
+        Posted by {% if post.author %}{{ post.author }}{% else %}{{ site.title }}{% endif %} on {{ post.date | date: "%B %-d, %Y" }}
+    </p>
 </div>
+<hr>
+{% endfor %}
 
-      </div>
-      
-  <footer id="footer" class="home-footer footer">
-    <div id="copyright" class="copyright">
-      &copy; 2017 dyman  Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>  Theme &copy; <a href="https://github.com/geekplux" target="_blank">GeekPlux</a>
-
-      </div>
-    </footer>
-
-      
-
-<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
-
-
-  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
-  <script src="/fancybox/jquery.fancybox.pack.js"></script>
-
-
-<script src="/js/typing.js"></script>
-<!--[if lt IE 9]><script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7/html5shiv.min.js"></script><![endif]-->
-
-
-
-
-
-
-
-    </div>
-  </body>
-</html>
+<!-- Pager -->
+{% if paginator.total_pages > 1 %}
+<ul class="pager">
+    {% if paginator.previous_page %}
+    <li class="previous">
+        <a href="{{ paginator.previous_page_path | prepend: site.baseurl | replace: '//', '/' }}">&larr; Newer Posts</a>
+    </li>
+    {% endif %}
+    {% if paginator.next_page %}
+    <li class="next">
+        <a href="{{ paginator.next_page_path | prepend: site.baseurl | replace: '//', '/' }}">Older Posts &rarr;</a>
+    </li>
+    {% endif %}
+</ul>
+{% endif %}
