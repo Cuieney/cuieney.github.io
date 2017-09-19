@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  <title>synchronized与对象的Monitor | DymanBlog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="synchronized介绍关于synchronized我们已经在《synchronized与Lock》一文中进行了比较全面的介绍。 当我们使用synchronized修饰方法名时，编译后会在方法名上生成一个ACC_SYNCHRONIZED标识来实现同步；当使用synchronized修饰代码块时，编译后会在代码块的前后生成monitorenter和monitorexit字节码来实现同步。 无论使">
+<meta name="keywords" content="Java线程">
+<meta property="og:type" content="article">
+<meta property="og:title" content="synchronized与对象的Monitor">
+<meta property="og:url" content="http://yoursite.com/2017/08/07/synchronized与对象的Monitor/index.html">
+<meta property="og:site_name" content="DymanBlog">
+<meta property="og:description" content="synchronized介绍关于synchronized我们已经在《synchronized与Lock》一文中进行了比较全面的介绍。 当我们使用synchronized修饰方法名时，编译后会在方法名上生成一个ACC_SYNCHRONIZED标识来实现同步；当使用synchronized修饰代码块时，编译后会在代码块的前后生成monitorenter和monitorexit字节码来实现同步。 无论使">
+<meta property="og:image" content="http://oubicdo5u.bkt.clouddn.com/Monitor%20Object%20Sequence%20Diagram.jpg">
+<meta property="og:image" content="http://oubicdo5u.bkt.clouddn.com/Java%20Monitor%E5%B7%A5%E4%BD%9C%E6%9C%BA%E7%90%86.jpg">
+<meta property="og:updated_time" content="2017-08-07T13:58:21.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="synchronized与对象的Monitor">
+<meta name="twitter:description" content="synchronized介绍关于synchronized我们已经在《synchronized与Lock》一文中进行了比较全面的介绍。 当我们使用synchronized修饰方法名时，编译后会在方法名上生成一个ACC_SYNCHRONIZED标识来实现同步；当使用synchronized修饰代码块时，编译后会在代码块的前后生成monitorenter和monitorexit字节码来实现同步。 无论使">
+<meta name="twitter:image" content="http://oubicdo5u.bkt.clouddn.com/Monitor%20Object%20Sequence%20Diagram.jpg">
+  
+    <link rel="alternate" href="/atom.xml" title="DymanBlog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="images/ironMan.ico">
+  
+  <link rel="stylesheet" href="/css/typing.css">
+</head>
+
+  
+    
+      <body class="dark">
+    
+  
+      <div id="container" class="container">
+        <article id="post-synchronized与对象的Monitor" class="article article-type-post" itemscope itemprop="blogPost">
+  <header id="header" class="header">
+  <nav id="main-nav" class="main-nav">
+    
+      <a class="main-nav-link" href="/">Home</a>
+    
+      <a class="main-nav-link" href="/archives">Archives</a>
+    
+      <a class="main-nav-link" href="/about">About</a>
+    
+  </nav>
+  <nav id="sub-nav">
+    
+      <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+    
+  </nav>
+</header>
+
+  <hr/>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      synchronized与对象的Monitor
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry typo" itemprop="articleBody">
+      
+        <h3 id="synchronized介绍"><a href="#synchronized介绍" class="headerlink" title="synchronized介绍"></a>synchronized介绍</h3><p>关于synchronized我们已经在《synchronized与Lock》一文中进行了比较全面的介绍。</p>
+<p>当我们使用synchronized修饰方法名时，编译后会在方法名上生成一个ACC_SYNCHRONIZED标识来实现同步；当使用synchronized修饰代码块时，编译后会在代码块的前后生成monitorenter和monitorexit字节码来实现同步。</p>
+<p>无论使用哪种方式实现，本质上都是对指定对象相关联的monitor的获取，只有获取到对象的monitor的线程，才可以执行方法或代码块，其他获取失败的线程会被阻塞，并放入同步队列中，进入BLOCKED状态。</p>
+<h3 id="监视器monitor"><a href="#监视器monitor" class="headerlink" title="监视器monitor"></a>监视器monitor</h3><p>这篇文章的主角——monitor，终于出现了，首先我们看一下java的官方文档中对monitor的解释：</p>
+<blockquote>
+<p>Synchronizationis built around an internal entity known as the intrinsic lock ormonitor lock. (The API specification often refers to this entity simplyas a “monitor.”)，Every object has an intrinsic lock associated with it.By convention, a thread that needs exclusive and consistent access toan object’s fields has to acquire the object’s intrinsic lock beforeaccessing them, and then release the intrinsic lock when it’s done withthem. </p>
+</blockquote>
+<p>（先根据官方文档解释一番）</p>
+<p>在多线程访问共享资源的时候，经常会带来可见性和原子性的安全问题。为了解决这类线程安全的问题，Java提供了同步机制、互斥锁机制，这个机制保证了在同一问题内只有一个线程能访问共享资源。这个机制的保障来源于监视锁Monitor，每个对象都拥有自己的监视锁Monitor。</p>
+<h3 id="Monitor-Object-设计模式"><a href="#Monitor-Object-设计模式" class="headerlink" title="Monitor Object 设计模式"></a>Monitor Object 设计模式</h3><p>我们使用Monitor Object设计模式来解决这类问题：将被客户线程并发访问的对象定义为一个monitor对象。客户线程仅能通过monitor对象的同步方法才能使用monitor对象定义的服务。为了防止陷入竞争条件，在任一时刻只能有一个同步方法被执行。每一个monitor对象包含一个monitor锁，被同步方法用于串行访问对象的行为和状态。此外，同步方法可以根据一个或多个与monitor对象相关的monitor conditions来决定在何种情况下挂起或恢复它们的执行。</p>
+<p>Java对于这样一个典型的模式做了很好的语言层面的封装，因此对于Java的开发者来说，很多关于该模式本身的东西被屏蔽掉了，如果希望从本质上对Monitor Object设计模式有一个更全面的认识，可以结合C++版本的Monitor Object设计模式。可参考此文：<a href="https://www.ibm.com/developerworks/cn/java/j-lo-synchronized/" target="_blank" rel="external">https://www.ibm.com/developerworks/cn/java/j-lo-synchronized/</a> </p>
+<h5 id="结构"><a href="#结构" class="headerlink" title="结构"></a>结构</h5><p>在Monitor Object模式中，主要有四种类型的参与者：</p>
+<ul>
+<li>监视者对象（Monitor Object）：负责定义公共的接口方法，这些公共的接口方法会在多线程的环境下被调用执行；</li>
+<li>同步方法：这些方法是监视者对象锁定义。为了防止竞争条件，无论是否同时有多个线程并发调用同步方法，还是监视者对象含有多个同步方法，在任一时间内只有监视者对象的一个同步方法能够被执行。</li>
+<li>监视锁（Monitor Lock）：每一个监视者对象都会拥有一把监视锁。</li>
+<li>监视条件（Monitor Condition）：同步方法使用监视锁和监视条件来决定方法是否需要阻塞或重新执行。</li>
+</ul>
+<h5 id="执行时序图"><a href="#执行时序图" class="headerlink" title="执行时序图"></a>执行时序图</h5><p><img src="http://oubicdo5u.bkt.clouddn.com/Monitor%20Object%20Sequence%20Diagram.jpg"></p>
+<h4 id="认识Java-Monitor-Object"><a href="#认识Java-Monitor-Object" class="headerlink" title="认识Java Monitor Object"></a>认识Java Monitor Object</h4><p>Java Monitor从两个方面来支持线程之间的同步，即：互斥执行与协作。Java使用对象锁（通过synchronized获得对象锁）保证工作在共享的数据集上的线程互斥执行，使用 notify/notifyAll/wait 方法来协同不同线程之间的工作。这些方法在Object类上被定义，会被所有的Java对象自动继承。</p>
+<p>实质上，Java的Object类本身就是监视者对象，Java语言对于这样一个典型并发设计模式做了内建的支持。不过，在Java里，我们已经看不到C++中的区域锁与条件变量的概念了。下图很好地描述了Java Monitor的工作机理：</p>
+<p><img src="http://oubicdo5u.bkt.clouddn.com/Java%20Monitor%E5%B7%A5%E4%BD%9C%E6%9C%BA%E7%90%86.jpg"></p>
+<p>线程如果获得监视锁成功，将成为监视者对象的拥有者。在任一时刻内，监视者对象只属于一个活动线程（Owner）。拥有者线程可以调用wait方法自动释放监视锁，进入等待状态。</p>
+<h4 id="Java-Monitor-Object的实践"><a href="#Java-Monitor-Object的实践" class="headerlink" title="Java Monitor Object的实践"></a>Java Monitor Object的实践</h4><p>在这里，我们将使用监视者对象设计模式来解决一个实际问题。</p>
+<p>这是一个典型的生产者消费者模式的问题。假设我们由一个固定长度的消息队列，该队列会被多个生产者消费者线程所操作，生产者线程负责将消息放入该队列，而消费者线程负责从该队列中取出消息。</p>
+<p>Message Class</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Message</span> </span>&#123;</div><div class="line">  <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> OBJECT_COUNT = <span class="number">0</span>;</div><div class="line">  <span class="keyword">public</span> <span class="keyword">int</span> objectIndex;</div><div class="line">  </div><div class="line">  Message() &#123;</div><div class="line">    <span class="keyword">synchronized</span>(Message.class) &#123;</div><div class="line">      OBJECT_COUNT++;</div><div class="line">      objectIndex = OBJECT_COUNT;</div><div class="line">    &#125;</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="meta">@Override</span></div><div class="line">  <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">return</span> <span class="string">"message["</span>+objectIndex+<span class="string">"]"</span>;</div><div class="line">  &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>MessageQueue Class</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">MessageQueue</span> </span>&#123;</div><div class="line">  <span class="keyword">private</span> <span class="keyword">int</span> messageCount;</div><div class="line">  <span class="keyword">private</span> <span class="keyword">int</span> maxMessages;</div><div class="line">  <span class="keyword">private</span> Message[] buffer;</div><div class="line">  <span class="keyword">private</span> <span class="keyword">int</span> in = <span class="number">0</span>, out = <span class="number">0</span>;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">public</span> <span class="title">MessageQueue</span><span class="params">(<span class="keyword">int</span> maxMessages)</span> </span>&#123;</div><div class="line">    maxMessages = maxMessages;</div><div class="line">    messageCount = <span class="number">0</span>;</div><div class="line">    buffer = <span class="keyword">new</span> Message[maxMessages];</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">synchronized</span> <span class="keyword">boolean</span> <span class="title">full</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">return</span> isFull();</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">put</span><span class="params">(Message msg)</span> </span>&#123;</div><div class="line">    <span class="keyword">while</span>(isFull()) &#123;</div><div class="line">      <span class="keyword">try</span> &#123;</div><div class="line">        wait();	<span class="comment">//release monitor lock, wait for space in the queue</span></div><div class="line">      &#125; <span class="keyword">catch</span>(InterruptedException e) &#123;</div><div class="line">        <span class="comment">//	do something</span></div><div class="line">      &#125; <span class="keyword">finally</span> &#123;</div><div class="line">        <span class="comment">//	do something</span></div><div class="line">      &#125;</div><div class="line">    &#125;</div><div class="line">    put(msg);</div><div class="line">    notifyAll();</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">synchronized</span> Message <span class="title">get</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">while</span>(isEmpty()) &#123;</div><div class="line">      <span class="keyword">try</span> &#123;</div><div class="line">        wait();<span class="comment">//release monitor lock, wait for message in the queue</span></div><div class="line">      &#125; <span class="keyword">catch</span>(InterruptedException e) &#123;</div><div class="line">        <span class="comment">//	do something</span></div><div class="line">      &#125; <span class="keyword">finally</span> &#123;</div><div class="line">        <span class="comment">//	do something</span></div><div class="line">      &#125;</div><div class="line">    &#125;</div><div class="line">    Message msg = get();</div><div class="line">    notifyAll();</div><div class="line">    <span class="keyword">return</span> msg;</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">isEmpty</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">return</span> messageCount == <span class="number">0</span>;</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">isFull</span><span class="params">()</span> </span>&#123;</div><div class="line">    <span class="keyword">return</span> messageCount == maxMessages;</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">put</span><span class="params">(Message msg)</span> </span>&#123;</div><div class="line">    buffer[in] = msg;</div><div class="line">    in = (in + <span class="number">1</span>) % maxMessages;<span class="comment">//避免越界</span></div><div class="line">    messageCount++;</div><div class="line">  &#125;</div><div class="line">  </div><div class="line">  <span class="function"><span class="keyword">private</span> Message <span class="title">get</span><span class="params">()</span> </span>&#123;</div><div class="line">    Message msg = buffer[out];</div><div class="line">    out = (out + <span class="number">1</span>) % maxMessages;</div><div class="line">    messageCount--;</div><div class="line">    <span class="keyword">return</span> msg;</div><div class="line">  &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>在Java版本中，我们不需要亲自开发Scoped Lock，Thread Condition类，Java语言给我们提供了内建的支持，我们很容易使用synchronized，wait/notify 这些 Java 特性来构建基于 Monitor Object 模式的应用。而缺点是：缺乏一些必要的灵活性。比如：在 Java 的版本中，我们并不能区分出 not empty 与 not full 这两个条件变量，所以我们只能使用 notifyAll 来通知所有等待者线程，而C++ 版本使用了不同的通知唤醒：not_full.notify 与 not_empty.notify。同样，在 Java 中对于 synchronized 的使用，后面一定要跟{}语句块，这在代码的书写上有些不灵活，而在C++中的，Scoped Lock默认就是保护当前的语句块，当然你也可以选择使用{}来显示声明。而且，使用 synchronized 所获得的对象锁，无法细粒度地区分是获得读锁还是写锁。</p>
+<p>不过总的来说，Java的确简化了基于 Monitor Object 并发模式的开发。不过，我们应该意识到，并发的实际应用开发绝不会像 Java语法这么体现出来的简单，简洁。我们更应该看到并发应用程序本质的一些东西，这有利于帮助我们构建更加健壮的并发应用。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <ul class="article-meta">
+        <li>
+          <span class="label">Published Date:</span>
+          <a href="/2017/08/07/synchronized与对象的Monitor/" class="article-date">
+  <time datetime="2017-08-07T13:53:04.000Z" itemprop="datePublished">2017-08-07</time>
+</a>
+
+        </li>
+        
+        
+          <li>
+            <span class="label">Tag:</span>
+            
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java线程/">Java线程</a></li></ul>
+
+
+          </li>
+        
+        <hr/>
+      </ul>
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav" class="article-nav">
+  
+    <a href="/2017/08/09/史上最快的消息队列：ZeroMQ/" id="article-nav-newer" class="article-nav-link-wrap newer">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          史上最快的消息队列：ZeroMQ
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2017/08/06/Thread和Runable的区别/" id="article-nav-older" class="article-nav-link-wrap older">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Thread和Runable的区别</div>
+    </a>
+  
+</nav>
+
+
+  
+</article>
+
+
+
+
+      </div>
+      
+    <footer id="footer" class="post-footer footer">
+      <hr/>
+      <div id="footerContent" class="footer-content">
+        <p>人を信じよ、しかしその百倍も自らを信じよ</p>
+
+
+      </div>
+    </footer>
+
+      
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/typing.js"></script>
+<!--[if lt IE 9]><script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7/html5shiv.min.js"></script><![endif]-->
+
+
+
+
+
+
+
+    </div>
+  </body>
+</html>
