@@ -1,0 +1,307 @@
+---
+layout:     post
+title:      "Android 组件化开发详解"
+subtitle:   " \"Hello World, Hello Android\""
+date:       2016-12-16 13:00:00
+author:     "Cuieney"
+header-img: "img/post-bg-2015.jpg"
+catalog: true
+tags:
+    - 架构
+---
+
+## 前提
+
+> 之前在一直单独干，自己随便搭个框架就开始开发，such as mvc mvp mvvm clean 一些mv*架构吧，可以随便弄随便改，方便自己的开发同时也可以锻炼自己的架构方面的知识吧，确实学到很多，比如MVP + RxJava + Retrofit + Dagger2 + GreenDAO + Glide 这些结合起来用真的让开发速度提升了很多有想学习的同学可以看看这个app喜欢的可以关注下 [Life APP](https://github.com/Cuieney/vld)
+
+> 但是目前由于工作原因吗，需要和几个小伙伴一起开发，合作开发，可能不能这样随便玩玩了，就需要考虑到合作开发需要注意的问题，由于项目是刚刚开始，必定要考虑到之后开发一些坑吗，打包这个问题，做android的同学，每次遇到都是很无语，项目很大的话可能打包一个需要五六分钟，太痛苦了，这是后大家应该会想到的是插件化开发，随时随地的更新app内容而不需要打包上线这些流程什么的，但是这个大部分是用于动态修复bug和更新模块，可能会有些偏离我们要做的事情，我们要做到是 代码耦合度降低，每个模块完全达到 解耦，不互相牵连，这样保证了每个人的开发效率，同时每个module之间也可以打包成相应的apk 进行测试
+
+### 原理
+---
+
+正常我们开发app的时候在gradle里面配置的主module都是Application，其他的都是Library，那么组件化开发会有什么区别的，其实也就是让每个module运行起来，就是就是把pludgin改成 Application 发布的时候合并即可
+
+### 架构
+---
+
+不知道有些同学开过饿了吗和滴滴打车发布的他们的app开发框架，毕竟是大公司，维护成本和开发成本都很大，他们之前在某it论坛上发布了一篇文章就是说组件化开发架构，把所有的基础 所有公共的东西提取出成一个BaseSDK
+然后每个module依赖这个Library
+
+![copy.png](http://upload-images.jianshu.io/upload_images/3415839-40a2b2269eef0777.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+
+### 简要
+
+先说说组件化开发会遇到的一些问题吧
+
+> 1.module与Application之间调用的问题
+
+> 2.跨module的Activity 或 Fragment 之间的跳转问题
+
+> 3.AAR 或Library project 重复依赖
+
+> 4.资源名冲突
+
+**下面我会一一的说明如何解决这些问题。**
+
+### project 配置
+
+组件化的基本就是通过 gradle 脚本来做的。
+
+这时候需要组件化的业务module中需要配置
+
+
+```
+if (isDebug.toBoolean()) {
+    apply plugin: 'com.android.application'
+} else {
+    apply plugin: 'com.android.library'
+}
+```
+
+就是说当我们在没发布版本之前，我们的每个module之间是相互没有任何依赖的都可以单独运行
+isDebug这个字段可以在最外层的gradle里面配置，也可以在业务 module 中放一个 gradle.properties来配置，
+但是我个人感觉吗，最好在外出gradle中配置，这样每个module 可以用一个总开关来控制。
+
+下面放置一个完整的module 供参考
+
+```
+def Dependencies = rootProject.ext
+if (isDebug.toBoolean()) {
+    apply plugin: 'com.android.application'
+} else {
+    apply plugin: 'com.android.library'
+}
+apply plugin: 'me.tatarka.retrolambda'
+apply plugin: 'android-apt'
+android {
+    compileSdkVersion Dependencies.androidCompileSdkVersion
+    buildToolsVersion Dependencies.androidBuildToolsVersion
+    resourcePrefix "preview_"
+    defaultConfig {
+        if (isDebug.toBoolean()) {
+            applicationId "com.cuieney.preview"
+        }
+        minSdkVersion Dependencies.androidMinSdkVersion
+        targetSdkVersion Dependencies.androidTargetSdkVersion
+        versionCode Dependencies.versionCode
+        versionName Dependencies.versionName
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+
+
+    sourceSets {
+        main {
+            if (isDebug.toBoolean()) {
+                manifest.srcFile 'src/debug/AndroidManifest.xml'
+            } else {
+                manifest.srcFile 'src/release/AndroidManifest.xml'
+            }
+        }
+    }
+
+
+    packagingOptions {
+        exclude 'META-INF/rxjava.properties'
+    }
+
+    lintOptions {
+        abortOnError Dependencies.abortOnLintError
+        checkReleaseBuilds Dependencies.checkReleaseBuilds
+        ignoreWarnings Dependencies.ignoreWarnings
+    }
+
+    compileOptions {
+        sourceCompatibility Dependencies.javaVersion
+        targetCompatibility Dependencies.javaVersion
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    repositories {
+        flatDir {
+            dirs 'libs'
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    testCompile 'junit:junit:4.12'
+    compile (name: 'StreamingLib', ext: 'aar')
+    compile project(':meetvrsdk')
+    apt Dependencies.dataDependencies.arouter_compiler
+}
+
+```
+
+可以根据自己的需求进行修改
+
+### Manifest
+
+当module单独运行的时候和合并运行的时候每个需要用的manifest也是有些许不同的，一些细微的差别的，但是这个我们也是需要注意的，简单的一句代码在gradle重配置即可
+
+```
+    sourceSets {
+        main {
+            if (isDebug.toBoolean()) {
+                manifest.srcFile 'src/debug/AndroidManifest.xml'
+            } else {
+                manifest.srcFile 'src/release/AndroidManifest.xml'
+            }
+        }
+    }
+```
+根据我们之前全局设置的isDebug来进行切换manifest即可。main 下的 manifest 写通用的东西，另外 2 个分别写各自独立的，通常 release 的 manifest 只是一个空的 application 标签，而 debug 的会有 application 和调试用的 activity（你总得要有个启动 activity 吧）及权限。
+
+这里有一个小 tip，就是在 release 的 manifest 中，application 标签下尽量不要放任何东西，只是占个位，让上面去 merge，否则比如一个 module supportsRtl 设置为了 true，另一个 module 设置为了 false，就不得不去做 override 了。
+
+### module与Application之间调用的问题
+
+这个问题可能每个人会有不同的写法和解决方法，这里我提供一个简单的解决方案。
+由于我们每个module都会依赖我们的BaseSDK这个library，其实在我们的 BaseSDK中直接定义个BaseApplication即可，然而每个module都可以通过BaseApplication来调用，这样就可以解决module与Application之间调用的问题。代码如下，可根据自己的需求不同进行修改
+
+```
+public abstract class BaseApplication extends Application {
+    public static BaseApplication app;
+    public static BaseApplication getInstance() {
+        return app;
+    }
+    protected static boolean isDebug = true;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        app = this;
+        initSDK();
+    }
+
+    public abstract void initSDK();
+}
+
+```
+在我们的主application中可以继承这个类然后写一些自己需要初始化的东西
+代码如下：
+
+```
+public class App extends BaseApplication {
+
+
+    @Override
+    public void initSDK() {
+
+        if (LeakCanary.isInAnalyzerProcess(this)) {
+            return;
+        }
+        LeakCanary.install(this);
+    }
+}
+
+```
+只要把公共需求的东西定义在Base中，然而调用的时候就可以解决这些问题
+
+
+### 跨module的Activity 或 Fragment 之间的跳转问题
+
+这个问题呢，解决方案有很多种 可以自己写个router来解决跳转之间的问题，也可以借助三方工具来完成这个操作。
+自己写router呢，只不过感觉很有些麻烦，直接上图吧
+
+![屏幕快照 2017-03-27 下午2.44.57.png](http://upload-images.jianshu.io/upload_images/3415839-13946e1012c386b9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+**ActivityRouter**
+
+```
+public class ActivityRouter {
+
+    public static void startActivity(Context context, String action) {
+        context.startActivity(new Intent(action));
+    }
+
+    public static void startActivity(Context context, Class clazz) {
+        context.startActivity(getIntent(context, clazz));
+    }
+
+    public static Intent getIntent(Context context, Class clazz) {
+        return new Intent(context, clazz);
+    }
+
+    public static void startActivityForName(Context context, String name) {
+        try {
+            Class clazz = Class.forName(name);
+            startActivity(context, clazz);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+```
+
+**FragmentRouter**
+
+```
+public class FragmentRouter {
+
+    public static Fragment getFragment(String name) {
+        Fragment fragment;
+        try {
+            Class fragmentClass = Class.forName(name);
+            fragment = (Fragment) fragmentClass.newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return fragment;
+    }
+}
+
+```
+**RouterList**
+
+```
+public class RouterList {
+    public static final String PREVIEW_MAIN = "com.cuieney.preview.PreviewActivity";
+}
+```
+
+就这些自己可以这样使用。但是我还是推荐使用三方，因为act跳转传值问题，act请求fragment问题，还有许多未知的坑，所以推荐两个三方router  [ARouter](https://github.com/alibaba/ARouter),
+[ActivityRouter](https://github.com/mzule/ActivityRouter)，这两个可以根据自己需求进行选择，我用的是ActivityRouter。感觉配置起来会方便许多
+
+**ActivityRouter一些配置细节**
+
+1.ActivityRouter提供的compile可以配置在BaseSDK中，然后apt配置在需要组件化的module中
+
+2.AndroidManifest配置呢，也是如此这个需要配置在需要组件化的module中。而不是主module中，但是如果说是release可以配置在主module中
+
+3.其他的一些配置可以参考ActivityRouter readme
+
+#### AAR 或Library project 重复依赖
+
+解决方案各有不同，可以在dependency中根据isDebug 来判断依赖包问题等，可以是 将 compile 改为 provided，只在最终的项目中 compile 对应的代码，但是这种办法只能用于没有资源的纯代码工程或者jar包；目前我了解的是这两种方法 ，大家可以看看还有什么好的办法提供解决思路
+
+#### 资源名冲突
+这个问题解决最简单，可以自己命名的时候相互注意一下，也可以在对于的module中的gradle配置
+
+```
+resourcePrefix "preview_"
+```
+设置了这个值后，你所有的资源名必须以指定的字符串做前缀，否则会报错。
+但是 resourcePrefix 这个值只能限定 xml 里面的资源，并不能限定图片资源，所有图片资源仍然需要你手动去修改资源名。
+
+#### ending
+可能前期不会考虑到后面项目逐渐增大了之后 模块之间的耦合度，需求复杂度上升等问题，但是组件化开发的形式可以解耦，降低开发成本，提高编译速度，为什么不用呢。何乐而不为。
+
+开开心心上班，安安心心睡觉
+
+
+—— Cuieney 后记于 2017.03
+
+

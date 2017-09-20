@@ -1,0 +1,74 @@
+---
+layout:     post
+title:      "小程序初接触体验"
+subtitle:   " \"Hello World, Hello Android\""
+date:       2016-12-16 13:00:00
+author:     "Cuieney"
+header-img: "img/post-bg-2015.jpg"
+catalog: true
+tags:
+    - 小程序
+---
+
+### 下载开发工具
+
+<a href="https://mp.weixin.qq.com/debug/wxadoc/dev/devtools/download.html">工具下载地址</a>，下载好微信扫一下即可登录进行开发。
+### 创建工程项目
+
+ 扫一扫之后，会出现一个页面就是添加项目，点击即可。会出现一下界面
+![1.png](http://upload-images.jianshu.io/upload_images/3415839-dc372a327dbd6885.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+如果你是给公司开发的，那你肯定会有appid的，我们练手玩玩的话，直接选择无appid，填好相应的项目名称和项目目录即可。这时候就会出现属于你的一个简易的demo。
+### 项目目录分析
+
+创建好demo之后，会到一个简易的demo也没，点击编辑菜单，在其右边就是目录结构
+![2.png](http://upload-images.jianshu.io/upload_images/3415839-fef772e683d6e88f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+可以看到初始化的时候微信给我门创建好了相应的目录结构，pages目录 utils目录，以及相应的文件，这里我只对照android开发中进行一些简单的解释，如果想要得到更深的理解可以看微信官方者文档 
+<a href="https://mp.weixin.qq.com/debug/wxadoc/dev/framework/MINA.html">目录结构及说明</a>
+#### 第一
+
+首先我门先解释一下pages 到底干嘛的，pages呢就相当于我门android开发中的activity目录一样，utils目录呢就不多说了，也就是工具类嘛！什么图片加载工具类啊网络请求工具类啊什么的，你也可以在创建个目录叫做image 那大概就是我们开发中的res 目录，但是呢，在我们没创建一个页面的时候就需要在app.json里面注册一下，类似于AndroidManifest里面注册activity一样的道理，app.js和app.json和app.wxss类似于我门的application 把所有全局要用到的东西都初始化一下。就相当于android开发中你要用第三方sdk的时候要在application 文件里面初始化一样。看以下说明
+![3.png](http://upload-images.jianshu.io/upload_images/3415839-31310f27783fb4e5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+是不是更清晰了，js就是我门的逻辑层，json就是我门要设置的全局层，wxss呢就是我门的res里面的value，color，等等，如果你之前接触过html和js的话就当我这是废话，因为这就相当于wxss 就相当于css样式表。
+#### 第二
+
+打开pages目录可以看到有一个index页面和logs页面，在打开的话可以看到每个页面目录下都有.js .wxml .wxss文件，仔细观察有的demo里面还包括.json(这里我说明一下，如果你在当前的页面创建了响应的json文件的话，他就不会复用最外层的app.json而是你当前创建的json里面所配置的内容)，
+
+接下来我门分析一下.js .wxml .wxss具体干嘛的。
+首先我门来看一下.js吧，他其实就相当于我门创建的activity里面包含的逻辑。  其次呢这是最主要的，他这个页面和我们的activty一样也是根据生命周期来的
+<a href="https://mp.weixin.qq.com/debug/wxadoc/dev/framework/app-service/page.html">生命周期官方解释类似于android的生命周期</a>下面我截了图部分生命周期图
+![4.png](http://upload-images.jianshu.io/upload_images/3415839-f237dad3255b0469.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+可以看到了吧，data就是我们初始化的一些变量，onload就是activity里面的onCreate（）方法。下面的我就不一一解释了。官方很详细。
+
+下面我门来解释一下.wxml这个文件的具体内容。就是我门的布局文件layout 多了一个w而已，android中就是.xml一个道理。看看下面的内容
+![5.png](http://upload-images.jianshu.io/upload_images/3415839-80c809e50aaf3416.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+里面的view层就是我门的linearlayout relativelayout fragmentlayout但是需要你在view 里面配置参数来实现到底是linearlayout，还是relativelayout，还是这个fragmentlayout，然后看看下方的image 不就是我门的imageview嘛！都是这些控件。
+<a href="https://mp.weixin.qq.com/debug/wxadoc/dev/component/">官方给出的控件说明</a>，你需要的里面都有。他这里的数据绑定形式类似于我门android 中的databinding这个三方库（mvvm）
+
+接下来我们来说一下.wxml吧 没接触过html的人会有些难理解（个人猜测）这个就是tmd 给每个控件赋不同样式的文件，我门打开看一下
+![6.png](http://upload-images.jianshu.io/upload_images/3415839-f6826b537fe96ba4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+看到上面的内容了嘛，.userinfo-avatar看到了嘛 宽高外边距 等等等一下内容，如果你想试用这种样式的话直接在.wxml空间里面  class="userinfo-avatar"这样就行了。这个文件的功能就是这样
+
+还有最后一个json文件就是我们的设置顶部导航栏一些东西，下面是里面配置的一些参数，如果你页面没有这个文件他会复用app.json这个文件的配置
+![6.png](http://upload-images.jianshu.io/upload_images/3415839-65d5af2d6551e289.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+说了这么多，没接触过的应该会了解不少。那么我们是不是应该自己动手写一写呢。给大家看一下我最近写的一个东西，change 接口是用charles抓的，类似于开眼视频吧。也是个简单的demo 有兴趣的可以下载看看
+<a href="https://github.com/Cuieney/change">山寨版开眼视频</a>，里面该有的功能都有，没有很好的封装。简单的实现了一些功能
+![首页.png](http://upload-images.jianshu.io/upload_images/3415839-d561f7d26b70b530.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+![分类
+![带导航栏.png](http://upload-images.jianshu.io/upload_images/3415839-7163b076d5ed4801.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+png](http://upload-images.jianshu.io/upload_images/3415839-e7a012344b3bdc2a.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+一般开发这些东西足够了。刷新加载啊什么的
+https://github.com/venshine/wechat-lightapp
+
+### 总结
+
+大家可以看一下，这里面可以有助于你学习的更快，功能实现的更完美。我也是个业余爱好者。
+
+
+
+
+
+—— Cuieney 后记于 2017.02
+
+
