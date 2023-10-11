@@ -1,7 +1,7 @@
 > 写写代码，做做设计，  
 > 离开世界之前，一切都是过程。
 
-Hey，我是崔晓璁，病毒种，进化程度不明，多出没于[博客](https://cuieney.github.io)、[微博](weibo.com/cuieney)、[知乎](https://www.zhihu.com/people/cuieney/pins/posts)、[Twitter](https://twitter.com/cuieney/)、[Github](http://github.com/Cuieney)、[Medium](https://medium.com/@Cuieney) 等地带，绝招尚在开发中。
+Hey，我是一名极客，病毒种，进化程度不明，多出没于[博客](https://cuieney.github.io)、[微博](weibo.com/cuieney)、[知乎](https://www.zhihu.com/people/cuieney/pins/posts)、[Twitter](https://twitter.com/cuieney/)、[Github](http://github.com/Cuieney)、[Medium](https://medium.com/@Cuieney) 等地带，绝招尚在开发中。
 
 (https://medium.com/elemefe/upgrading-ele-me-to-progressive-web-app-2a446832e509)。
 
